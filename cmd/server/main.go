@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"room-decorator/internal/api"
 	"room-decorator/internal/core"
@@ -14,6 +15,15 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+				a.Value = slog.TimeValue(a.Value.Time().UTC())
+			}
+			return a
+		},
+	})))
+
 	repo := infra.NewInMemoryJobRepo()
 	queue := infra.NewInMemoryQueue(10)
 
@@ -35,24 +45,25 @@ func main() {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("listening on %s", httpServer.Addr)
+		slog.Info("listening", "addr", httpServer.Addr)
 		serverErr <- httpServer.ListenAndServe()
 	}()
 
 	select {
 	case err := <-serverErr:
 		if !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "err", err)
+			os.Exit(1)
 		}
 	case <-ctx.Done():
-		log.Println("shutdown signal received")
+		slog.Info("shutdown signal received")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("graceful shutdown failed: %v", err)
+		slog.Error("graceful shutdown failed", "err", err)
 	}
-	log.Println("server stopped")
+	slog.Info("server stopped")
 }

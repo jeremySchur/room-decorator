@@ -1,7 +1,7 @@
 package core
 
 import (
-	"log"
+	"log/slog"
 	"room-decorator/internal/infra"
 	"room-decorator/internal/models"
 	"time"
@@ -23,9 +23,9 @@ func CreateJob(repo *infra.InMemoryJobRepo, queue *infra.InMemoryQueue, payload 
 }
 
 func ProcessJob(job *models.Job) error {
-	log.Printf("processing job %s", job.ID)
+	slog.Info("processing job", "job_id", job.ID)
 	time.Sleep(500 * time.Millisecond)
-	log.Printf("finished processing job %s", job.ID)
+	slog.Info("finished processing job", "job_id", job.ID)
 
 	return nil
 }

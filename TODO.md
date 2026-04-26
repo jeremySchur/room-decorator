@@ -59,10 +59,3 @@ Benefits:
 `internal/infra` has tests; `core` and `api` don't. Once the interfaces
 above exist, handler tests with `httptest.NewRecorder` and service tests
 with fake repo/queue become straightforward.
-
-## Migrate `log` → `log/slog`
-
-Go 1.21+ ships structured logging in the stdlib. Replace `log.Printf` calls
-with `slog.Info` / `slog.Error` and pass key/value pairs (e.g.
-`slog.Info("job processed", "job_id", id, "status", status)`). Pays off
-once logs grow large enough that you want to filter by field.

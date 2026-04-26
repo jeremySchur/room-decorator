@@ -1,7 +1,7 @@
 package core
 
 import (
-	"log"
+	"log/slog"
 	"room-decorator/internal/infra"
 	"room-decorator/internal/models"
 )
@@ -12,7 +12,7 @@ func RunWorker(repo *infra.InMemoryJobRepo, queue *infra.InMemoryQueue) {
 
 		job, ok := repo.Get(jobID)
 		if !ok {
-			log.Printf("job %s not found, skipping", jobID)
+			slog.Warn("job not found, skipping", "job_id", jobID)
 			continue
 		}
 
