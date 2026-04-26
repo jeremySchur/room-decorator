@@ -22,8 +22,12 @@ func main() {
 	server := api.NewServer(repo, queue)
 
 	httpServer := &http.Server{
-		Addr:    ":8080",
-		Handler: server.Routes(),
+		Addr:              ":8080",
+		Handler:           server.Routes(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

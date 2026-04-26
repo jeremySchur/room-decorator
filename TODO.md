@@ -2,23 +2,6 @@
 
 Future work items, in no particular order.
 
-## Graceful worker shutdown
-
-`http.Server.Shutdown` (if/when added) only stops the HTTP server — it does
-not tell the worker goroutine to stop processing. When `main` returns, the
-worker is killed abruptly and may be cut off mid-job.
-
-Wiring graceful worker shutdown means:
-
-- Give `core.RunWorker` a `context.Context` parameter.
-- Have the loop `select` between `queue.Dequeue()` and `<-ctx.Done()` so it
-  can exit cleanly when the context is cancelled.
-- Cancel that context from `main` after `httpServer.Shutdown` returns, and
-  wait on a `done` channel before exiting so any in-flight job finishes.
-
-Not required to get the API running, but worth doing once jobs do real
-work or persistence is added.
-
 ## Real `ProcessJob` implementation
 
 `core.ProcessJob` currently just sleeps for 500ms and returns nil. Replace
@@ -56,13 +39,6 @@ fixes:
 - Or just make the buffer large enough that this won't happen in practice.
 
 The first option is more correct, the second is simpler. Pick consciously.
-
-## HTTP server timeouts
-
-`http.Server` defaults to no read/write/idle timeouts, which lets a slow
-client tie up a connection forever (slow-loris attack). Set
-`ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` on
-the `http.Server` in `cmd/server/main.go`. ~4 lines.
 
 ## Repo and queue as interfaces
 
