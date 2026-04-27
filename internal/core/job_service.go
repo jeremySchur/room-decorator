@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"log/slog"
 	"room-decorator/internal/infra"
 	"room-decorator/internal/models"
@@ -9,17 +10,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreateJob(repo *infra.InMemoryJobRepo, queue *infra.InMemoryQueue, payload string) *models.Job {
+func CreateJob(ctx context.Context, repo JobRepo, queue *infra.InMemoryQueue, payload string) (*models.Job, error) {
+	now := time.Now().UTC()
 	job := &models.Job{
 		ID:        uuid.NewString(),
 		Status:    models.Pending,
 		Payload:   payload,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
-	repo.Insert(job)
+	if err := repo.Insert(ctx, job); err != nil {
+		return nil, err
+	}
 	queue.Enqueue(job.ID)
-	return job
+	return job, nil
 }
 
 func ProcessJob(job *models.Job) error {

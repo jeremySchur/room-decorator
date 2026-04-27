@@ -12,6 +12,8 @@ import (
 	"room-decorator/internal/infra"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -24,7 +26,42 @@ func main() {
 		},
 	})))
 
-	repo := infra.NewInMemoryJobRepo()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		slog.Error("DATABASE_URL is required")
+		os.Exit(1)
+	}
+
+	// Pool sizing tuned for Supabase free-tier session pooler (port 5432).
+	// If we ever switch to the transaction pooler (port 6543), pgx's
+	// prepared-statement caching will break — set
+	// cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec then.
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		slog.Error("invalid DATABASE_URL", "err", err)
+		os.Exit(1)
+	}
+	cfg.MaxConns = 5
+	cfg.MinConns = 0
+	cfg.MaxConnLifetime = 30 * time.Minute
+	cfg.MaxConnIdleTime = 5 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		slog.Error("failed to create db pool", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := pool.Ping(pingCtx); err != nil {
+		pingCancel()
+		slog.Error("failed to ping db", "err", err)
+		os.Exit(1)
+	}
+	pingCancel()
+
+	repo := infra.NewPostgresJobRepo(pool)
 	queue := infra.NewInMemoryQueue(10)
 
 	go core.RunWorker(repo, queue)

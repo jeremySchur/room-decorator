@@ -1,38 +1,50 @@
 package infra
 
 import (
+	"context"
+	"errors"
 	"room-decorator/internal/models"
-	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type InMemoryJobRepo struct {
-	mu   sync.Mutex
-	jobs map[string]*models.Job
+type PostgresJobRepo struct {
+	pool *pgxpool.Pool
 }
 
-func NewInMemoryJobRepo() *InMemoryJobRepo {
-	return &InMemoryJobRepo{jobs: make(map[string]*models.Job)}
+func NewPostgresJobRepo(pool *pgxpool.Pool) *PostgresJobRepo {
+	return &PostgresJobRepo{pool: pool}
 }
 
-func (r *InMemoryJobRepo) Get(jobID string) (*models.Job, bool) {
-	r.mu.Lock()
-	job, ok := r.jobs[jobID]
-	r.mu.Unlock()
-	return job, ok
-}
+func (r *PostgresJobRepo) Get(ctx context.Context, id string) (*models.Job, error) {
+	const q = `SELECT id, status, payload, created_at, updated_at FROM jobs WHERE id = $1`
 
-func (r *InMemoryJobRepo) Insert(job *models.Job) {
-	r.mu.Lock()
-	r.jobs[job.ID] = job
-	r.mu.Unlock()
-}
-
-func (r *InMemoryJobRepo) UpdateStatus(jobID string, status models.JobStatus) {
-	r.mu.Lock()
-	if job, ok := r.jobs[jobID]; ok {
-		job.Status = status
-		job.UpdatedAt = time.Now().UTC()
+	var job models.Job
+	err := r.pool.QueryRow(ctx, q, id).Scan(
+		&job.ID, &job.Status, &job.Payload, &job.CreatedAt, &job.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, models.ErrJobNotFound
 	}
-	r.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (r *PostgresJobRepo) Insert(ctx context.Context, job *models.Job) error {
+	const q = `INSERT INTO jobs (id, status, payload, created_at, updated_at)
+	           VALUES ($1, $2, $3, $4, $5)`
+
+	_, err := r.pool.Exec(ctx, q, job.ID, job.Status, job.Payload, job.CreatedAt, job.UpdatedAt)
+	return err
+}
+
+func (r *PostgresJobRepo) UpdateStatus(ctx context.Context, id string, status models.JobStatus) error {
+	const q = `UPDATE jobs SET status = $1, updated_at = $2 WHERE id = $3`
+
+	_, err := r.pool.Exec(ctx, q, status, time.Now().UTC(), id)
+	return err
 }

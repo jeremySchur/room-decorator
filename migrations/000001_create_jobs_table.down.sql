@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS jobs_status_idx;
+DROP TABLE IF EXISTS jobs;
+DROP TYPE IF EXISTS job_status;

@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrJobNotFound = errors.New("job not found")
 
 type JobStatus string
 
